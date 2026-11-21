@@ -1,0 +1,134 @@
+// KasirPro - Point of Sale database schema
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("KASIR") // ADMIN | KASIR
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id         String   @id @default(cuid())
+  name       String
+  sku        String   @unique
+  categoryId String
+  price      Float
+  cost       Float    @default(0)
+  stock      Int      @default(0)
+  image      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category          Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  transactionDetails TransactionDetail[]
+
+  @@index([categoryId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  customerId    String?
+  cashierId     String
+  subtotal      Float
+  discount      Float    @default(0)
+  taxRate       Float    @default(0)
+  taxAmount     Float    @default(0)
+  total         Float
+  note          String?
+  status        String   @default("COMPLETED") // COMPLETED | VOIDED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cashier   User               @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  customer  Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  details   TransactionDetail[]
+  payment   Payment?
+
+  @@index([cashierId])
+  @@index([createdAt])
+}
+
+model TransactionDetail {
+  id            String  @id @default(cuid())
+  transactionId String
+  productId     String
+  productName   String
+  quantity      Int
+  price         Float
+  subtotal      Float
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([productId])
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  transactionId String   @unique
+  method        String // CASH | TRANSFER | QRIS
+  amountPaid    Float
+  change        Float
+  reference     String? // transfer/QRIS reference
+  createdAt     DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+}
+
+model Setting {
+  id           String  @id @default("default")
+  storeName    String  @default("KasirPro Store")
+  address      String  @default("")
+  phone        String  @default("")
+  email        String  @default("")
+  taxRate      Float   @default(0)
+  taxEnabled   Boolean @default(false)
+  currency     String  @default("IDR")
+  receiptNote  String  @default("Terima kasih atas kunjungan Anda")
+  footerNote   String  @default("")
+  // QRIS / payment gateway (optional). Leave empty to disable QRIS.
+  qrisMerchantId String?
+  qrisApiKey     String?
+  qrisEnabled    Boolean @default(false)
+  updatedAt     DateTime @updatedAt
+}
